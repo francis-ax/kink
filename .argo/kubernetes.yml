@@ -14,6 +14,18 @@ inputs:
     PODCIDR:
       default: "10.100.0.0/16"
 steps:
+- CHECKOUT_KUBERNETES:
+    image: argoproj/argoscm:v2.0
+    resources:
+      mem_mib: 500
+      cpu_cores: 0.1
+    command: ["axscm", "clone", "https://github.com/kubernetes/kubernetes.git", "/src"]
+    outputs:
+      artifacts:
+        CODE:
+          path: /src
+
+
 - CLUSTER_CONFIG:
     image: alpine:latest
     resources:
@@ -51,6 +63,7 @@ steps:
       artifacts.CLUSTERID: "%%steps.CLUSTER_CONFIG.outputs.artifacts.PARAM%%"
       artifacts.ISMASTER: "%%steps.CLUSTER_CONFIG.outputs.artifacts.ISMASTER%%"
       artifacts.PODCIDR: "%%steps.CLUSTER_CONFIG.outputs.artifacts.PODCIDR%%"
+      artifacts.CODE: "%%steps.CHECKOUT_KUBERNETES.outputs.artifacts.CODE%%"
 - MINION_DEPLOYMENT:
     template: k8s-minion-deployment
     arguments:
@@ -102,6 +115,7 @@ inputs:
     CLUSTERID:
     ISMASTER:
     PODCIDR:
+    CODE:
 application_name: "%%inputs.parameters.APPNAME%%"
 deployment_name: master
 volumes:
@@ -151,6 +165,9 @@ containers:
         PODCIDR:
           from: "%%inputs.artifacts.PODCIDR%%"
           path: /etc/kubernetes/clusterconfig/pod_cidr_range # pod_cidr file is expected here
+        CODE:
+          from: "%%inputs.artifacts.CODE%%"
+          path: /src
       volumes:
         ETCD:
           from: "%%volumes.etcd%%"
@@ -196,3 +213,4 @@ containers:
     annotations:
       ax_ea_privileged: 'true'
       ax_ea_graph_storage_volume: '{"graph-storage-size": "40Gi", "mount-path": "/var/lib/docker"}'
+
